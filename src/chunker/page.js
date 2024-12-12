@@ -15,6 +15,7 @@ class Page {
 		this.height = undefined;
 
 		this.hooks = hooks;
+		this.errors = [];
 
 		this.settings = options || {};
 
@@ -134,7 +135,14 @@ class Page {
 
 		this.layoutMethod = new Layout(this.area, this.hooks, settings);
 
+		if (this.layoutMethod.errors) this.errors.push(...this.layoutMethod.errors);
+
 		let renderResult = await this.layoutMethod.renderTo(this.wrapper, contents, breakToken);
+
+		if (renderResult.error) {
+			this.errors.push(renderResult.error);
+		}
+
 		let newBreakToken = renderResult.breakToken;
 
 		this.addListeners(contents);
@@ -151,6 +159,11 @@ class Page {
 		}
 
 		let renderResult = await this.layoutMethod.renderTo(this.wrapper, contents, breakToken);
+
+		if (renderResult.error) {
+			this.errors.push(renderResult.error);
+		}
+
 		let newBreakToken = renderResult.breakToken;
 
 		this.endToken = newBreakToken;

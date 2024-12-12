@@ -42,10 +42,10 @@ class Layout {
 		this.bounds = this.element.getBoundingClientRect();
 		this.parentBounds = this.element.offsetParent.getBoundingClientRect();
 		let gap = parseFloat(window.getComputedStyle(this.element).columnGap);
-	
+
 		if (gap) {
 			let leftMargin = this.bounds.left - this.parentBounds.left;
-			this.gap =  gap - leftMargin;	
+			this.gap =  gap - leftMargin;
 		} else {
 			this.gap = 0;
 		}
@@ -69,6 +69,7 @@ class Layout {
 
 		this.maxChars = this.settings.maxChars || MAX_CHARS_PER_BREAK;
 		this.forceRenderBreak = false;
+		this.error = null;
 	}
 
 	async renderTo(wrapper, source, breakToken, bounds = this.bounds) {
@@ -105,10 +106,20 @@ class Layout {
 
 				newBreakToken = this.findBreakToken(wrapper, source, bounds, prevBreakToken);
 
-				if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-					console.warn("Unable to layout item: ", prevNode);
-					this.hooks && this.hooks.beforeRenderResult.trigger(undefined, wrapper, this);
-					return new RenderResult(undefined, new OverflowContentError("Unable to layout item", [prevNode]));
+				if (newBreakToken?.equals(prevBreakToken)) {
+					console.log('1')
+					const errorMessage = "Unable to layout item";
+					const errorDetails = { item: prevNode };
+
+					this.error = { errorMessage, ...errorDetails };
+					console.warn(`${errorMessage}:`, prevNode);
+
+					this.hooks?.beforeRenderResult.trigger(undefined, wrapper, this);
+
+					return new RenderResult(
+						undefined,
+						new OverflowContentError(errorMessage, [prevNode])
+					);
 				}
 
 				this.rebuildTableFromBreakToken(newBreakToken, wrapper);
@@ -136,13 +147,22 @@ class Layout {
 					this.rebuildTableFromBreakToken(newBreakToken, wrapper);
 				}
 
-				if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-					console.warn("Unable to layout item: ", node);
-					let after = newBreakToken.node && nodeAfter(newBreakToken.node);
-					if (after) {
-						newBreakToken = new BreakToken(after);
+				if (newBreakToken?.equals(prevBreakToken)) {
+					console.log('2')
+					const errorMessage = "Unable to layout item";
+					console.warn(`${errorMessage}:`, node);
+
+					this.error = { msg: errorMessage, item: node };
+
+					const afterNode = newBreakToken.node ? nodeAfter(newBreakToken.node) : null;
+
+					if (afterNode) {
+						newBreakToken = new BreakToken(afterNode);
 					} else {
-						return new RenderResult(undefined, new OverflowContentError("Unable to layout item", [node]));
+						return new RenderResult(
+							undefined,
+							new OverflowContentError(errorMessage, [node])
+						);
 					}
 				}
 
@@ -213,14 +233,23 @@ class Layout {
 					this.rebuildTableFromBreakToken(newBreakToken, wrapper);
 				}
 
-				if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-					console.warn("Unable to layout item: ", node);
-					let after = newBreakToken.node && nodeAfter(newBreakToken.node);
-					if (after) {
-						newBreakToken = new BreakToken(after);
+				if (newBreakToken?.equals(prevBreakToken)) {
+					console.log('3')
+					const errorMessage = "Unable to layout item";
+					console.warn(`${errorMessage}:`, node);
+
+					this.error = { msg: errorMessage, item: node };
+
+					const afterNode = newBreakToken.node ? nodeAfter(newBreakToken.node) : null;
+
+					if (afterNode) {
+						newBreakToken = new BreakToken(afterNode);
 					} else {
-						this.hooks && this.hooks.beforeRenderResult.trigger(undefined, wrapper, this);
-						return new RenderResult(undefined, new OverflowContentError("Unable to layout item", [node]));
+						this.hooks?.beforeRenderResult.trigger(undefined, wrapper, this);
+						return new RenderResult(
+							undefined,
+							new OverflowContentError(errorMessage, [node])
+						);
 					}
 				}
 			}
@@ -228,6 +257,8 @@ class Layout {
 		}
 
 		this.hooks && this.hooks.beforeRenderResult.trigger(newBreakToken, wrapper, this);
+
+		if(this.error) return new RenderResult(newBreakToken, new OverflowContentError(this.error.msg,this.error.item));
 		return new RenderResult(newBreakToken);
 	}
 
