@@ -107,7 +107,6 @@ class Layout {
 				newBreakToken = this.findBreakToken(wrapper, source, bounds, prevBreakToken);
 
 				if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-					console.log('1');
 					const errorMessage = "Unable to layout item";
 					const errorDetails = { item: prevNode };
 
@@ -148,7 +147,6 @@ class Layout {
 				}
 
 				if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-					console.log('2');
 					const errorMessage = "Unable to layout item";
 					console.warn(`${errorMessage}:`, node);
 
@@ -234,7 +232,6 @@ class Layout {
 				}
 
 				if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-					console.log('3');
 					const errorMessage = "Unable to layout item";
 					console.warn(`${errorMessage}:`, node);
 
