@@ -1471,7 +1471,6 @@
 					newBreakToken = this.findBreakToken(wrapper, source, bounds, prevBreakToken);
 
 					if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-						console.log('1');
 						const errorMessage = "Unable to layout item";
 						const errorDetails = { item: prevNode };
 
@@ -1512,7 +1511,6 @@
 					}
 
 					if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-						console.log('2');
 						const errorMessage = "Unable to layout item";
 						console.warn(`${errorMessage}:`, node);
 
@@ -1582,7 +1580,6 @@
 
 				// Only check x characters
 				if (length >= this.maxChars) {
-
 					this.hooks && this.hooks.layout.trigger(wrapper, this);
 
 					let imgs = wrapper.querySelectorAll("img");
@@ -1598,7 +1595,6 @@
 					}
 
 					if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
-						console.log('3');
 						const errorMessage = "Unable to layout item";
 						console.warn(`${errorMessage}:`, node);
 
@@ -1618,6 +1614,36 @@
 					}
 				}
 
+				// Check for overflow and handle it
+				if (this.hasOverflow(wrapper, bounds)) {
+					this.hooks && this.hooks.layout.trigger(wrapper, this);
+
+					newBreakToken = this.findBreakToken(wrapper, source, bounds, prevBreakToken);
+
+					if (newBreakToken) {
+						length = 0;
+						this.rebuildTableFromBreakToken(newBreakToken, wrapper);
+					}
+
+					if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
+						const errorMessage = "Unable to layout item";
+						console.warn(`${errorMessage}:`, node);
+
+						this.error = { msg: errorMessage, item: node };
+
+						const afterNode = newBreakToken.node ? nodeAfter(newBreakToken.node) : null;
+
+						if (afterNode) {
+							newBreakToken = new BreakToken(afterNode);
+						} else {
+							this.hooks && this.hooks.beforeRenderResult.trigger(undefined, wrapper, this);
+							return new RenderResult(
+								undefined,
+								new OverflowContentError(errorMessage, [node])
+							);
+						}
+					}
+				}
 			}
 
 			this.hooks && this.hooks.beforeRenderResult.trigger(newBreakToken, wrapper, this);
