@@ -16,30 +16,85 @@
 
 	var d$2 = {exports: {}};
 
-	var isImplemented$6 = function () {
+	// ES3 safe
+	var _undefined$1 = void 0;
+
+	var is$4 = function (value) { return value !== _undefined$1 && value !== null; };
+
+	var isValue$5 = is$4;
+
+	// prettier-ignore
+	var possibleTypes = { "object": true, "function": true, "undefined": true /* document.all */ };
+
+	var is$3 = function (value) {
+		if (!isValue$5(value)) return false;
+		return hasOwnProperty.call(possibleTypes, typeof value);
+	};
+
+	var isObject$3 = is$3;
+
+	var is$2 = function (value) {
+		if (!isObject$3(value)) return false;
+		try {
+			if (!value.constructor) return false;
+			return value.constructor.prototype === value;
+		} catch (error) {
+			return false;
+		}
+	};
+
+	var isPrototype = is$2;
+
+	var is$1 = function (value) {
+		if (typeof value !== "function") return false;
+
+		if (!hasOwnProperty.call(value, "length")) return false;
+
+		try {
+			if (typeof value.length !== "number") return false;
+			if (typeof value.call !== "function") return false;
+			if (typeof value.apply !== "function") return false;
+		} catch (error) {
+			return false;
+		}
+
+		return !isPrototype(value);
+	};
+
+	var isFunction$1 = is$1;
+
+	var classRe = /^\s*class[\s{/}]/, functionToString = Function.prototype.toString;
+
+	var is = function (value) {
+		if (!isFunction$1(value)) return false;
+		if (classRe.test(functionToString.call(value))) return false;
+		return true;
+	};
+
+	var isImplemented$7 = function () {
 		var assign = Object.assign, obj;
 		if (typeof assign !== "function") return false;
 		obj = { foo: "raz" };
 		assign(obj, { bar: "dwa" }, { trzy: "trzy" });
-		return (obj.foo + obj.bar + obj.trzy) === "razdwatrzy";
+		return obj.foo + obj.bar + obj.trzy === "razdwatrzy";
 	};
 
-	var isImplemented$5;
-	var hasRequiredIsImplemented$1;
+	var isImplemented$6;
+	var hasRequiredIsImplemented$2;
 
-	function requireIsImplemented$1 () {
-		if (hasRequiredIsImplemented$1) return isImplemented$5;
-		hasRequiredIsImplemented$1 = 1;
+	function requireIsImplemented$2 () {
+		if (hasRequiredIsImplemented$2) return isImplemented$6;
+		hasRequiredIsImplemented$2 = 1;
 
-		isImplemented$5 = function () {
+		isImplemented$6 = function () {
 			try {
 				Object.keys("primitive");
 				return true;
 			} catch (e) {
-		 return false;
-		}
+				return false;
+			}
 		};
-		return isImplemented$5;
+		return isImplemented$6;
 	}
 
 	// eslint-disable-next-line no-empty-function
@@ -47,9 +102,7 @@
 
 	var _undefined = noop$4(); // Support ES3 engines
 
-	var isValue$3 = function (val) {
-	 return (val !== _undefined) && (val !== null);
-	};
+	var isValue$4 = function (val) { return val !== _undefined && val !== null; };
 
 	var shim$5;
 	var hasRequiredShim$5;
@@ -58,13 +111,11 @@
 		if (hasRequiredShim$5) return shim$5;
 		hasRequiredShim$5 = 1;
 
-		var isValue = isValue$3;
+		var isValue = isValue$4;
 
 		var keys = Object.keys;
 
-		shim$5 = function (object) {
-			return keys(isValue(object) ? Object(object) : object);
-		};
+		shim$5 = function (object) { return keys(isValue(object) ? Object(object) : object); };
 		return shim$5;
 	}
 
@@ -75,16 +126,14 @@
 		if (hasRequiredKeys) return keys;
 		hasRequiredKeys = 1;
 
-		keys = requireIsImplemented$1()()
-			? Object.keys
-			: requireShim$5();
+		keys = requireIsImplemented$2()() ? Object.keys : requireShim$5();
 		return keys;
 	}
 
-	var isValue$2 = isValue$3;
+	var isValue$3 = isValue$4;
 
 	var validValue = function (value) {
-		if (!isValue$2(value)) throw new TypeError("Cannot use null or undefined");
+		if (!isValue$3(value)) throw new TypeError("Cannot use null or undefined");
 		return value;
 	};
 
@@ -119,11 +168,9 @@
 		return shim$4;
 	}
 
-	var assign$2 = isImplemented$6()
-		? Object.assign
-		: requireShim$4();
+	var assign$2 = isImplemented$7() ? Object.assign : requireShim$4();
 
-	var isValue$1 = isValue$3;
+	var isValue$2 = isValue$4;
 
 	var forEach$1 = Array.prototype.forEach, create$5 = Object.create;
 
@@ -136,21 +183,17 @@
 	var normalizeOptions = function (opts1 /*, …options*/) {
 		var result = create$5(null);
 		forEach$1.call(arguments, function (options) {
-			if (!isValue$1(options)) return;
+			if (!isValue$2(options)) return;
 			process(Object(options), result);
 		});
 		return result;
 	};
 
-	var isCallable$1 = function (obj) {
-	 return typeof obj === "function";
-	};
-
 	var str = "razdwatrzy";
 
-	var isImplemented$4 = function () {
+	var isImplemented$5 = function () {
 		if (typeof str.contains !== "function") return false;
-		return (str.contains("dwa") === true) && (str.contains("foo") === false);
+		return str.contains("dwa") === true && str.contains("foo") === false;
 	};
 
 	var shim$3;
@@ -162,48 +205,45 @@
 
 		var indexOf = String.prototype.indexOf;
 
-		shim$3 = function (searchString/*, position*/) {
+		shim$3 = function (searchString /*, position*/) {
 			return indexOf.call(this, searchString, arguments[1]) > -1;
 		};
 		return shim$3;
 	}
 
-	var contains$1 = isImplemented$4()
-		? String.prototype.contains
-		: requireShim$3();
+	var contains$1 = isImplemented$5() ? String.prototype.contains : requireShim$3();
 
-	var assign$1        = assign$2
-	  , normalizeOpts = normalizeOptions
-	  , isCallable    = isCallable$1
-	  , contains      = contains$1
+	var isValue$1         = is$4
+	  , isPlainFunction = is
+	  , assign$1          = assign$2
+	  , normalizeOpts   = normalizeOptions
+	  , contains        = contains$1;
 
-	  , d$1;
-
-	d$1 = d$2.exports = function (dscr, value/*, options*/) {
+	var d$1 = (d$2.exports = function (dscr, value/*, options*/) {
 		var c, e, w, options, desc;
-		if ((arguments.length < 2) || (typeof dscr !== 'string')) {
+		if (arguments.length < 2 || typeof dscr !== "string") {
 			options = value;
 			value = dscr;
 			dscr = null;
 		} else {
 			options = arguments[2];
 		}
-		if (dscr == null) {
+		if (isValue$1(dscr)) {
+			c = contains.call(dscr, "c");
+			e = contains.call(dscr, "e");
+			w = contains.call(dscr, "w");
+		} else {
 			c = w = true;
 			e = false;
-		} else {
-			c = contains.call(dscr, 'c');
-			e = contains.call(dscr, 'e');
-			w = contains.call(dscr, 'w');
 		}
 
 		desc = { value: value, configurable: c, enumerable: e, writable: w };
 		return !options ? desc : assign$1(normalizeOpts(options), desc);
-	};
+	});
 
 	d$1.gs = function (dscr, get, set/*, options*/) {
 		var c, e, options, desc;
-		if (typeof dscr !== 'string') {
+		if (typeof dscr !== "string") {
 			options = set;
 			set = get;
 			get = dscr;
@@ -211,23 +251,23 @@
 		} else {
 			options = arguments[3];
 		}
-		if (get == null) {
+		if (!isValue$1(get)) {
 			get = undefined;
-		} else if (!isCallable(get)) {
+		} else if (!isPlainFunction(get)) {
 			options = get;
 			get = set = undefined;
-		} else if (set == null) {
+		} else if (!isValue$1(set)) {
 			set = undefined;
-		} else if (!isCallable(set)) {
+		} else if (!isPlainFunction(set)) {
 			options = set;
 			set = undefined;
 		}
-		if (dscr == null) {
+		if (isValue$1(dscr)) {
+			c = contains.call(dscr, "c");
+			e = contains.call(dscr, "e");
+		} else {
 			c = true;
 			e = false;
-		} else {
-			c = contains.call(dscr, 'c');
-			e = contains.call(dscr, 'e');
 		}
 
 		desc = { get: get, set: set, configurable: c, enumerable: e };
@@ -1615,7 +1655,7 @@
 				}
 
 				// Check for overflow and handle it
-				if (this.hasOverflow(wrapper, bounds)) {
+				/*if (this.hasOverflow(wrapper, bounds)) {
 					this.hooks && this.hooks.layout.trigger(wrapper, this);
 
 					newBreakToken = this.findBreakToken(wrapper, source, bounds, prevBreakToken);
@@ -1643,7 +1683,7 @@
 							);
 						}
 					}
-				}
+				}*/
 			}
 
 			this.hooks && this.hooks.beforeRenderResult.trigger(newBreakToken, wrapper, this);
@@ -32461,13 +32501,79 @@
 		UndisplayedFilter
 	];
 
-	var isImplemented$3 = function () {
+	var isImplemented$4 = function () {
 		var from = Array.from, arr, result;
 		if (typeof from !== "function") return false;
 		arr = ["raz", "dwa"];
 		result = from(arr);
-		return Boolean(result && (result !== arr) && (result[1] === "dwa"));
+		return Boolean(result && result !== arr && result[1] === "dwa");
 	};
+
+	var isImplemented$3;
+	var hasRequiredIsImplemented$1;
+
+	function requireIsImplemented$1 () {
+		if (hasRequiredIsImplemented$1) return isImplemented$3;
+		hasRequiredIsImplemented$1 = 1;
+
+		isImplemented$3 = function () {
+			if (typeof globalThis !== "object") return false;
+			if (!globalThis) return false;
+			return globalThis.Array === Array;
+		};
+		return isImplemented$3;
+	}
+
+	var implementation;
+	var hasRequiredImplementation;
+
+	function requireImplementation () {
+		if (hasRequiredImplementation) return implementation;
+		hasRequiredImplementation = 1;
+		var naiveFallback = function () {
+			if (typeof self === "object" && self) return self;
+			if (typeof window === "object" && window) return window;
+			throw new Error("Unable to resolve global `this`");
+		};
+
+		implementation = (function () {
+			if (this) return this;
+
+			// Unexpected strict mode (may happen if e.g. bundled into ESM module)
+
+			// Thanks @mathiasbynens -> https://mathiasbynens.be/notes/globalthis
+			// In all ES5+ engines global object inherits from Object.prototype
+			// (if you approached one that doesn't please report)
+			try {
+				Object.defineProperty(Object.prototype, "__global__", {
+					get: function () { return this; },
+					configurable: true
+				});
+			} catch (error) {
+				// Unfortunate case of Object.prototype being sealed (via preventExtensions, seal or freeze)
+				return naiveFallback();
+			}
+			try {
+				// Safari case (window.__global__ is resolved with global context, but __global__ does not)
+				if (!__global__) return naiveFallback();
+				return __global__;
+			} finally {
+				delete Object.prototype.__global__;
+			}
+		})();
+		return implementation;
+	}
+
+	var globalThis_1;
+	var hasRequiredGlobalThis;
+
+	function requireGlobalThis () {
+		if (hasRequiredGlobalThis) return globalThis_1;
+		hasRequiredGlobalThis = 1;
+
+		globalThis_1 = requireIsImplemented$1()() ? globalThis : requireImplementation();
+		return globalThis_1;
+	}
 
 	var isImplemented$2;
 	var hasRequiredIsImplemented;
@@ -32476,13 +32582,16 @@
 		if (hasRequiredIsImplemented) return isImplemented$2;
 		hasRequiredIsImplemented = 1;
 
-		var validTypes = { object: true, symbol: true };
+		var global     = requireGlobalThis()
+		  , validTypes = { object: true, symbol: true };
 
 		isImplemented$2 = function () {
+			var Symbol = global.Symbol;
 			var symbol;
-			if (typeof Symbol !== 'function') return false;
-			symbol = Symbol('test symbol');
-			try { String(symbol); } catch (e) { return false; }
+			if (typeof Symbol !== "function") return false;
+			symbol = Symbol("test symbol");
+			try { String(symbol); }
+			catch (e) { return false; }
 
 			// Return 'true' also for polyfills
 			if (!validTypes[typeof Symbol.iterator]) return false;
@@ -32501,12 +32610,12 @@
 		if (hasRequiredIsSymbol) return isSymbol;
 		hasRequiredIsSymbol = 1;
 
-		isSymbol = function (x) {
-			if (!x) return false;
-			if (typeof x === 'symbol') return true;
-			if (!x.constructor) return false;
-			if (x.constructor.name !== 'Symbol') return false;
-			return (x[x.constructor.toStringTag] === 'Symbol');
+		isSymbol = function (value) {
+			if (!value) return false;
+			if (typeof value === "symbol") return true;
+			if (!value.constructor) return false;
+			if (value.constructor.name !== "Symbol") return false;
+			return value[value.constructor.toStringTag] === "Symbol";
 		};
 		return isSymbol;
 	}
@@ -32527,38 +32636,27 @@
 		return validateSymbol;
 	}
 
-	var polyfill;
-	var hasRequiredPolyfill;
+	var generateName;
+	var hasRequiredGenerateName;
 
-	function requirePolyfill () {
-		if (hasRequiredPolyfill) return polyfill;
-		hasRequiredPolyfill = 1;
+	function requireGenerateName () {
+		if (hasRequiredGenerateName) return generateName;
+		hasRequiredGenerateName = 1;
 
-		var d              = dExports
-		  , validateSymbol = requireValidateSymbol()
+		var d = dExports;
 
-		  , create = Object.create, defineProperties = Object.defineProperties
-		  , defineProperty = Object.defineProperty, objPrototype = Object.prototype
-		  , NativeSymbol, SymbolPolyfill, HiddenSymbol, globalSymbols = create(null)
-		  , isNativeSafe;
+		var create = Object.create, defineProperty = Object.defineProperty, objPrototype = Object.prototype;
 
-		if (typeof Symbol === 'function') {
-			NativeSymbol = Symbol;
-			try {
-				String(NativeSymbol());
-				isNativeSafe = true;
-			} catch (ignore) {}
-		}
-
-		var generateName = (function () {
-			var created = create(null);
-			return function (desc) {
-				var postfix = 0, name, ie11BugWorkaround;
-				while (created[desc + (postfix || '')]) ++postfix;
-				desc += (postfix || '');
-				created[desc] = true;
-				name = '@@' + desc;
-				defineProperty(objPrototype, name, d.gs(null, function (value) {
+		var created = create(null);
+		generateName = function (desc) {
+			var postfix = 0, name, ie11BugWorkaround;
+			while (created[desc + (postfix || "")]) ++postfix;
+			desc += postfix || "";
+			created[desc] = true;
+			name = "@@" + desc;
+			defineProperty(
+				objPrototype, name,
+				d.gs(null, function (value) {
 					// For IE11 issue see:
 					// https://connect.microsoft.com/IE/feedbackdetail/view/1928508/
 					//    ie11-broken-getters-on-dom-objects
@@ -32567,15 +32665,119 @@
 					ie11BugWorkaround = true;
 					defineProperty(this, name, d(value));
 					ie11BugWorkaround = false;
-				}));
-				return name;
-			};
-		}());
+				})
+			);
+			return name;
+		};
+		return generateName;
+	}
+
+	var standardSymbols;
+	var hasRequiredStandardSymbols;
+
+	function requireStandardSymbols () {
+		if (hasRequiredStandardSymbols) return standardSymbols;
+		hasRequiredStandardSymbols = 1;
+
+		var d            = dExports
+		  , NativeSymbol = requireGlobalThis().Symbol;
+
+		standardSymbols = function (SymbolPolyfill) {
+			return Object.defineProperties(SymbolPolyfill, {
+				// To ensure proper interoperability with other native functions (e.g. Array.from)
+				// fallback to eventual native implementation of given symbol
+				hasInstance: d(
+					"", (NativeSymbol && NativeSymbol.hasInstance) || SymbolPolyfill("hasInstance")
+				),
+				isConcatSpreadable: d(
+					"",
+					(NativeSymbol && NativeSymbol.isConcatSpreadable) ||
+						SymbolPolyfill("isConcatSpreadable")
+				),
+				iterator: d("", (NativeSymbol && NativeSymbol.iterator) || SymbolPolyfill("iterator")),
+				match: d("", (NativeSymbol && NativeSymbol.match) || SymbolPolyfill("match")),
+				replace: d("", (NativeSymbol && NativeSymbol.replace) || SymbolPolyfill("replace")),
+				search: d("", (NativeSymbol && NativeSymbol.search) || SymbolPolyfill("search")),
+				species: d("", (NativeSymbol && NativeSymbol.species) || SymbolPolyfill("species")),
+				split: d("", (NativeSymbol && NativeSymbol.split) || SymbolPolyfill("split")),
+				toPrimitive: d(
+					"", (NativeSymbol && NativeSymbol.toPrimitive) || SymbolPolyfill("toPrimitive")
+				),
+				toStringTag: d(
+					"", (NativeSymbol && NativeSymbol.toStringTag) || SymbolPolyfill("toStringTag")
+				),
+				unscopables: d(
+					"", (NativeSymbol && NativeSymbol.unscopables) || SymbolPolyfill("unscopables")
+				)
+			});
+		};
+		return standardSymbols;
+	}
+
+	var symbolRegistry;
+	var hasRequiredSymbolRegistry;
+
+	function requireSymbolRegistry () {
+		if (hasRequiredSymbolRegistry) return symbolRegistry;
+		hasRequiredSymbolRegistry = 1;
+
+		var d              = dExports
+		  , validateSymbol = requireValidateSymbol();
+
+		var registry = Object.create(null);
+
+		symbolRegistry = function (SymbolPolyfill) {
+			return Object.defineProperties(SymbolPolyfill, {
+				for: d(function (key) {
+					if (registry[key]) return registry[key];
+					return (registry[key] = SymbolPolyfill(String(key)));
+				}),
+				keyFor: d(function (symbol) {
+					var key;
+					validateSymbol(symbol);
+					for (key in registry) {
+						if (registry[key] === symbol) return key;
+					}
+					return undefined;
+				})
+			});
+		};
+		return symbolRegistry;
+	}
+
+	var polyfill;
+	var hasRequiredPolyfill;
+
+	function requirePolyfill () {
+		if (hasRequiredPolyfill) return polyfill;
+		hasRequiredPolyfill = 1;
+
+		var d                    = dExports
+		  , validateSymbol       = requireValidateSymbol()
+		  , NativeSymbol         = requireGlobalThis().Symbol
+		  , generateName         = requireGenerateName()
+		  , setupStandardSymbols = requireStandardSymbols()
+		  , setupSymbolRegistry  = requireSymbolRegistry();
+
+		var create = Object.create
+		  , defineProperties = Object.defineProperties
+		  , defineProperty = Object.defineProperty;
+
+		var SymbolPolyfill, HiddenSymbol, isNativeSafe;
+
+		if (typeof NativeSymbol === "function") {
+			try {
+				String(NativeSymbol());
+				isNativeSafe = true;
+			} catch (ignore) {}
+		} else {
+			NativeSymbol = null;
+		}
 
 		// Internal constructor (not one exposed) for creating Symbol instances.
 		// This one is used to ensure that `someSymbol instanceof Symbol` always return false
 		HiddenSymbol = function Symbol(description) {
-			if (this instanceof HiddenSymbol) throw new TypeError('Symbol is not a constructor');
+			if (this instanceof HiddenSymbol) throw new TypeError("Symbol is not a constructor");
 			return SymbolPolyfill(description);
 		};
 
@@ -32583,71 +32785,55 @@
 		// (returns instances of HiddenSymbol)
 		polyfill = SymbolPolyfill = function Symbol(description) {
 			var symbol;
-			if (this instanceof Symbol) throw new TypeError('Symbol is not a constructor');
+			if (this instanceof Symbol) throw new TypeError("Symbol is not a constructor");
 			if (isNativeSafe) return NativeSymbol(description);
 			symbol = create(HiddenSymbol.prototype);
-			description = (description === undefined ? '' : String(description));
+			description = description === undefined ? "" : String(description);
 			return defineProperties(symbol, {
-				__description__: d('', description),
-				__name__: d('', generateName(description))
+				__description__: d("", description),
+				__name__: d("", generateName(description))
 			});
 		};
-		defineProperties(SymbolPolyfill, {
-			for: d(function (key) {
-				if (globalSymbols[key]) return globalSymbols[key];
-				return (globalSymbols[key] = SymbolPolyfill(String(key)));
-			}),
-			keyFor: d(function (s) {
-				var key;
-				validateSymbol(s);
-				for (key in globalSymbols) if (globalSymbols[key] === s) return key;
-			}),
 
-			// To ensure proper interoperability with other native functions (e.g. Array.from)
-			// fallback to eventual native implementation of given symbol
-			hasInstance: d('', (NativeSymbol && NativeSymbol.hasInstance) || SymbolPolyfill('hasInstance')),
-			isConcatSpreadable: d('', (NativeSymbol && NativeSymbol.isConcatSpreadable) ||
-				SymbolPolyfill('isConcatSpreadable')),
-			iterator: d('', (NativeSymbol && NativeSymbol.iterator) || SymbolPolyfill('iterator')),
-			match: d('', (NativeSymbol && NativeSymbol.match) || SymbolPolyfill('match')),
-			replace: d('', (NativeSymbol && NativeSymbol.replace) || SymbolPolyfill('replace')),
-			search: d('', (NativeSymbol && NativeSymbol.search) || SymbolPolyfill('search')),
-			species: d('', (NativeSymbol && NativeSymbol.species) || SymbolPolyfill('species')),
-			split: d('', (NativeSymbol && NativeSymbol.split) || SymbolPolyfill('split')),
-			toPrimitive: d('', (NativeSymbol && NativeSymbol.toPrimitive) || SymbolPolyfill('toPrimitive')),
-			toStringTag: d('', (NativeSymbol && NativeSymbol.toStringTag) || SymbolPolyfill('toStringTag')),
-			unscopables: d('', (NativeSymbol && NativeSymbol.unscopables) || SymbolPolyfill('unscopables'))
-		});
+		setupStandardSymbols(SymbolPolyfill);
+		setupSymbolRegistry(SymbolPolyfill);
 
 		// Internal tweaks for real symbol producer
 		defineProperties(HiddenSymbol.prototype, {
 			constructor: d(SymbolPolyfill),
-			toString: d('', function () { return this.__name__; })
+			toString: d("", function () { return this.__name__; })
 		});
 
 		// Proper implementation of methods exposed on Symbol.prototype
 		// They won't be accessible on produced symbol instances as they derive from HiddenSymbol.prototype
 		defineProperties(SymbolPolyfill.prototype, {
-			toString: d(function () { return 'Symbol (' + validateSymbol(this).__description__ + ')'; }),
+			toString: d(function () { return "Symbol (" + validateSymbol(this).__description__ + ")"; }),
 			valueOf: d(function () { return validateSymbol(this); })
 		});
-		defineProperty(SymbolPolyfill.prototype, SymbolPolyfill.toPrimitive, d('', function () {
-			var symbol = validateSymbol(this);
-			if (typeof symbol === 'symbol') return symbol;
-			return symbol.toString();
-		}));
-		defineProperty(SymbolPolyfill.prototype, SymbolPolyfill.toStringTag, d('c', 'Symbol'));
+		defineProperty(
+			SymbolPolyfill.prototype, SymbolPolyfill.toPrimitive,
+			d("", function () {
+				var symbol = validateSymbol(this);
+				if (typeof symbol === "symbol") return symbol;
+				return symbol.toString();
+			})
+		);
+		defineProperty(SymbolPolyfill.prototype, SymbolPolyfill.toStringTag, d("c", "Symbol"));
 
 		// Proper implementaton of toPrimitive and toStringTag for returned symbol instances
-		defineProperty(HiddenSymbol.prototype, SymbolPolyfill.toStringTag,
-			d('c', SymbolPolyfill.prototype[SymbolPolyfill.toStringTag]));
+		defineProperty(
+			HiddenSymbol.prototype, SymbolPolyfill.toStringTag,
+			d("c", SymbolPolyfill.prototype[SymbolPolyfill.toStringTag])
+		);
 
 		// Note: It's important to define `toPrimitive` as last one, as some implementations
 		// implement `toPrimitive` natively without implementing `toStringTag` (or other specified symbols)
 		// And that may invoke error in definition flow:
 		// See: https://github.com/medikoo/es6-symbol/issues/13#issuecomment-164146149
-		defineProperty(HiddenSymbol.prototype, SymbolPolyfill.toPrimitive,
-			d('c', SymbolPolyfill.prototype[SymbolPolyfill.toPrimitive]));
+		defineProperty(
+			HiddenSymbol.prototype, SymbolPolyfill.toPrimitive,
+			d("c", SymbolPolyfill.prototype[SymbolPolyfill.toPrimitive])
+		);
 		return polyfill;
 	}
 
@@ -32658,7 +32844,9 @@
 		if (hasRequiredEs6Symbol) return es6Symbol;
 		hasRequiredEs6Symbol = 1;
 
-		es6Symbol = requireIsImplemented()() ? Symbol : requirePolyfill();
+		es6Symbol = requireIsImplemented()()
+			? requireGlobalThis().Symbol
+			: requirePolyfill();
 		return es6Symbol;
 	}
 
@@ -32670,15 +32858,9 @@
 		hasRequiredIsArguments = 1;
 
 		var objToString = Object.prototype.toString
-		  , id = objToString.call(
-			(function () {
-				return arguments;
-			})()
-		);
+		  , id = objToString.call((function () { return arguments; })());
 
-		isArguments = function (value) {
-			return objToString.call(value) === id;
-		};
+		isArguments = function (value) { return objToString.call(value) === id; };
 		return isArguments;
 	}
 
@@ -32689,10 +32871,11 @@
 		if (hasRequiredIsFunction) return isFunction;
 		hasRequiredIsFunction = 1;
 
-		var objToString = Object.prototype.toString, id = objToString.call(noop$4);
+		var objToString = Object.prototype.toString
+		  , isFunctionStringTag = RegExp.prototype.test.bind(/^[object [A-Za-z0-9]*Function]$/);
 
 		isFunction = function (value) {
-			return typeof value === "function" && objToString.call(value) === id;
+			return typeof value === "function" && isFunctionStringTag(objToString.call(value));
 		};
 		return isFunction;
 	}
@@ -32700,7 +32883,7 @@
 	var isImplemented$1 = function () {
 		var sign = Math.sign;
 		if (typeof sign !== "function") return false;
-		return (sign(10) === 1) && (sign(-20) === -1);
+		return sign(10) === 1 && sign(-20) === -1;
 	};
 
 	var shim$2;
@@ -32712,34 +32895,29 @@
 
 		shim$2 = function (value) {
 			value = Number(value);
-			if (isNaN(value) || (value === 0)) return value;
+			if (isNaN(value) || value === 0) return value;
 			return value > 0 ? 1 : -1;
 		};
 		return shim$2;
 	}
 
-	var sign$1 = isImplemented$1()
-		? Math.sign
-		: requireShim$2();
+	var sign$1 = isImplemented$1() ? Math.sign : requireShim$2();
 
-	var sign = sign$1
-
-	  , abs$1 = Math.abs, floor$1 = Math.floor;
+	var sign  = sign$1
+	  , abs$1   = Math.abs
+	  , floor$1 = Math.floor;
 
 	var toInteger$1 = function (value) {
 		if (isNaN(value)) return 0;
 		value = Number(value);
-		if ((value === 0) || !isFinite(value)) return value;
+		if (value === 0 || !isFinite(value)) return value;
 		return sign(value) * floor$1(abs$1(value));
 	};
 
 	var toInteger = toInteger$1
+	  , max       = Math.max;
 
-	  , max = Math.max;
-
-	var toPosInteger = function (value) {
-	 return max(0, toInteger(value));
-	};
+	var toPosInteger = function (value) { return max(0, toInteger(value)); };
 
 	var isString;
 	var hasRequiredIsString;
@@ -32775,14 +32953,14 @@
 		  , toPosInt       = toPosInteger
 		  , callable       = validCallable
 		  , validValue$1     = validValue
-		  , isValue        = isValue$3
+		  , isValue        = isValue$4
 		  , isString       = requireIsString()
 		  , isArray        = Array.isArray
 		  , call           = Function.prototype.call
 		  , desc           = { configurable: true, enumerable: true, writable: true, value: null }
 		  , defineProperty = Object.defineProperty;
 
-		// eslint-disable-next-line complexity
+		// eslint-disable-next-line complexity, max-lines-per-function
 		shim$1 = function (arrayLike /*, mapFn, thisArg*/) {
 			var mapFn = arguments[1]
 			  , thisArg = arguments[2]
@@ -32813,7 +32991,7 @@
 					}
 					if (isArray(arrayLike)) {
 						// Source: Array
-						arr = new Array(length = arrayLike.length);
+						arr = new Array((length = arrayLike.length));
 						for (i = 0; i < length; ++i) arr[i] = arrayLike[i];
 						return arr;
 					}
@@ -32889,9 +33067,7 @@
 		return shim$1;
 	}
 
-	var from = isImplemented$3()
-		? Array.from
-		: requireShim$1();
+	var from = isImplemented$4() ? Array.from : requireShim$1();
 
 	var isImplemented = function () {
 		var numberIsNaN = Number.isNaN;
@@ -32913,9 +33089,7 @@
 		return shim;
 	}
 
-	var isNan = isImplemented()
-		? Number.isNaN
-		: requireShim();
+	var isNan = isImplemented() ? Number.isNaN : requireShim();
 
 	var numberIsNaN       = isNan
 	  , toPosInt          = toPosInteger
@@ -32960,13 +33134,11 @@
 		);
 	};
 
-	var isValue = isValue$3;
+	var isValue = isValue$4;
 
 	var map = { function: true, object: true };
 
-	var isObject$1 = function (value) {
-		return (isValue(value) && map[typeof value]) || false;
-	};
+	var isObject$1 = function (value) { return (isValue(value) && map[typeof value]) || false; };
 
 	var isObject = isObject$1;
 
