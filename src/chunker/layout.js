@@ -251,7 +251,7 @@ class Layout {
 			}
 
 			// Check for overflow and handle it
-			if (this.hasOverflow(wrapper, bounds)) {
+			/*if (this.hasOverflow(wrapper, bounds)) {
 				this.hooks && this.hooks.layout.trigger(wrapper, this);
 
 				newBreakToken = this.findBreakToken(wrapper, source, bounds, prevBreakToken);
@@ -279,7 +279,7 @@ class Layout {
 						);
 					}
 				}
-			}
+			}*/
 		}
 
 		this.hooks && this.hooks.beforeRenderResult.trigger(newBreakToken, wrapper, this);
