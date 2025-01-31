@@ -110,7 +110,7 @@ class Layout {
 					const errorMessage = "Unable to layout item";
 					const errorDetails = { item: prevNode };
 					const component = prevNode.closest('.component');
-					const componentId = component?.getAttribute('data-id') ?? null;
+					const componentId =  component ? component.getAttribute('data-id') : null;
 
 					this.error = { errorMessage, ...errorDetails, componentId };
 					console.warn(`${errorMessage}:`, prevNode);
@@ -152,7 +152,7 @@ class Layout {
 					const errorMessage = "Unable to layout item";
 					console.warn(`${errorMessage}:`, node);
 					const component = node.closest('.component');
-					const componentId = component?.getAttribute('data-id') ?? null;
+					const componentId =  component ? component.getAttribute('data-id') : null;
 
 					this.error = { msg: errorMessage, item: node, componentId };
 
@@ -237,7 +237,7 @@ class Layout {
 				if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
 					const errorMessage = "Unable to layout item";
 					const component = node.closest('.component');
-					const componentId = component?.getAttribute('data-id') ?? null;
+					const componentId =  component ? component.getAttribute('data-id') : null;
 
 					console.warn(`${errorMessage}:`, node);
 
