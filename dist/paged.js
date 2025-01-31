@@ -926,9 +926,10 @@
 	}
 
 	class OverflowContentError extends Error {
-		constructor(message, items) {
+		constructor(message, items, componentId = null) {
 			super(message);
 			this.items = items;
+			this.componentId = componentId;
 		}
 	}
 
@@ -1513,15 +1514,17 @@
 					if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
 						const errorMessage = "Unable to layout item";
 						const errorDetails = { item: prevNode };
+						const component = prevNode.closest('.component');
+						const componentId = component?.getAttribute('data-id') ?? null;
 
-						this.error = { errorMessage, ...errorDetails };
+						this.error = { errorMessage, ...errorDetails, componentId };
 						console.warn(`${errorMessage}:`, prevNode);
 
 						this.hooks && this.hooks.beforeRenderResult.trigger(undefined, wrapper, this);
 
 						return new RenderResult(
 							undefined,
-							new OverflowContentError(errorMessage, [prevNode])
+							new OverflowContentError(errorMessage, [prevNode], componentId)
 						);
 					}
 
@@ -1553,8 +1556,10 @@
 					if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
 						const errorMessage = "Unable to layout item";
 						console.warn(`${errorMessage}:`, node);
+						const component = node.closest('.component');
+						const componentId = component?.getAttribute('data-id') ?? null;
 
-						this.error = { msg: errorMessage, item: node };
+						this.error = { msg: errorMessage, item: node, componentId };
 
 						const afterNode = newBreakToken.node ? nodeAfter(newBreakToken.node) : null;
 
@@ -1563,7 +1568,7 @@
 						} else {
 							return new RenderResult(
 								undefined,
-								new OverflowContentError(errorMessage, [node])
+								new OverflowContentError(errorMessage, [node], componentId)
 							);
 						}
 					}
@@ -1636,9 +1641,12 @@
 
 					if (newBreakToken && newBreakToken.equals(prevBreakToken)) {
 						const errorMessage = "Unable to layout item";
+						const component = node.closest('.component');
+						const componentId = component?.getAttribute('data-id') ?? null;
+
 						console.warn(`${errorMessage}:`, node);
 
-						this.error = { msg: errorMessage, item: node };
+						this.error = { msg: errorMessage, item: node, componentId };
 
 						const afterNode = newBreakToken.node ? nodeAfter(newBreakToken.node) : null;
 
@@ -1648,7 +1656,7 @@
 							this.hooks && this.hooks.beforeRenderResult.trigger(undefined, wrapper, this);
 							return new RenderResult(
 								undefined,
-								new OverflowContentError(errorMessage, [node])
+								new OverflowContentError(errorMessage, [node], componentId)
 							);
 						}
 					}
@@ -1688,7 +1696,7 @@
 
 			this.hooks && this.hooks.beforeRenderResult.trigger(newBreakToken, wrapper, this);
 
-			if(this.error) return new RenderResult(newBreakToken, new OverflowContentError(this.error.msg,this.error.item));
+			if(this.error) return new RenderResult(newBreakToken, new OverflowContentError(this.error.msg,this.error.item,this.error.componentId));
 			return new RenderResult(newBreakToken);
 		}
 

@@ -11,9 +11,10 @@ class RenderResult {
 }
 
 export class OverflowContentError extends Error {
-	constructor(message, items) {
+	constructor(message, items, componentId = null) {
 		super(message);
 		this.items = items;
+		this.componentId = componentId;
 	}
 }
 
