@@ -277,9 +277,13 @@ class Chunker {
 
 	async handleBreaks(node, force) {
 		let currentPage = this.total + 1;
-		let currentPosition = currentPage % 2 === 0 ? "left" : "right";
+		// EDGE fork patch (layout-time parity seed): break-before/after left|right|recto|verso must
+		// judge the side against the whole-book offset too, or a seeded segment inserts its blank
+		// filler pages on the wrong side. Mirrors the Page.index() classing patch.
+		let parityOffset = (typeof window !== "undefined" && window.PagedConfig && window.PagedConfig.startPageOffset) || 0;
+		let currentPosition = (currentPage + parityOffset) % 2 === 0 ? "left" : "right";
 		// TODO: Recto and Verso should reverse for rtl languages
-		let currentSide = currentPage % 2 === 0 ? "verso" : "recto";
+		let currentSide = (currentPage + parityOffset) % 2 === 0 ? "verso" : "recto";
 		let previousBreakAfter;
 		let breakBefore;
 		let page;

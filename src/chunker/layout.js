@@ -30,6 +30,17 @@ import Hook from "../utils/hook.js";
 
 const MAX_CHARS_PER_BREAK = 1500;
 
+// Exact-geometry clearance (px) for break decisions: content retained flush
+// against the area bottom loses the sub-pixel race when post-break restyles
+// (hyphen append, text-align-last, split-attr CSS) or the print pass's
+// independent re-rounding nudge it over — it then relayouts into the hidden
+// overflow column and print drops it. See findOverflow/textBreak.
+const BREAK_CLEARANCE = 1.5;
+// A parked/crossing extent smaller than this (~one text line, px) means
+// nothing splittable sits past the boundary — push the element whole instead
+// of splitting inside it.
+const TIGHT_CROSSING_MAX = 12;
+
 /**
  * Layout
  * @class
@@ -575,11 +586,69 @@ class Layout {
 
 			if (breakToken && breakToken.node && extract) {
 				let removed = this.removeOverflow(overflow, breakLetter);
+				// CLOSED-LOOP BREAK COMMIT. The historical protocol was open-loop: decide
+				// the break from measured geometry, then mutate that geometry (split
+				// attributes one page later in Splits.afterPageLayout, alignment CSS,
+				// hyphen glyphs) and never re-measure — every parked-content loss (sliced
+				// lines, flush rows, flush element boundaries) was that lag. Now the split
+				// attributes are applied HERE, at extraction time, so the page is in its
+				// final styling — then the overflow walk re-verifies it and, on any
+				// residual violation, widens the extraction and re-derives the token.
+				// Monotone (each retry extracts strictly more, guarded by equals()) and
+				// bounded; Splits.afterPageLayout stays as an idempotent backstop.
+				this.applySplitAttributes(overflow, rendered);
+				let verifyAttempts = 0;
+				while (verifyAttempts < 4) {
+					const residual = this.findOverflow(rendered, bounds, this.gap, true);
+					if (!residual) break;
+					const retryToken = this.createBreakToken(residual, rendered, source);
+					if (!retryToken || !retryToken.node || retryToken.equals(breakToken) || retryToken.equals(prevBreakToken)) break;
+					const retryLetter = retryToken.offset && retryToken.node.textContent
+						? retryToken.node.textContent.charAt(retryToken.offset)
+						: undefined;
+					removed = this.removeOverflow(residual, retryLetter);
+					this.applySplitAttributes(residual, rendered);
+					breakToken = retryToken;
+					verifyAttempts++;
+				}
 				this.hooks && this.hooks.afterOverflowRemoved.trigger(removed, rendered, this);
 			}
 
 		}
 		return breakToken;
+	}
+
+	// Mirrors Splits.afterPageLayout's attribute application (splitTo/splitOriginal on every
+	// retained ancestor of the break point, last-split alignment on the deepest one), applied
+	// at EXTRACTION time instead of one page later. The attributes activate the split-keyed
+	// stylesheet rules immediately, so the closed-loop verification above measures the page in
+	// the styling it will actually print with. Splits.afterPageLayout's :not([data-split-to])
+	// query skips elements marked here, so the late pass stays a no-op backstop.
+	applySplitAttributes(overflow, rendered) {
+		let container = overflow.startContainer;
+		let element = isElement(container) ? container : container.parentElement;
+		let deepest = null;
+		while (element && element !== rendered && isElement(element)) {
+			if (element.dataset && element.dataset.ref) {
+				element.dataset.splitTo = element.dataset.ref;
+				if (!element.dataset.splitFrom) {
+					element.dataset.splitOriginal = "true";
+				}
+				if (!deepest) deepest = element;
+			}
+			element = element.parentElement;
+		}
+		if (deepest) {
+			let styles = window.getComputedStyle(deepest);
+			let align = styles["text-align"];
+			let alignLast = styles["text-align-last"];
+			deepest.dataset.lastSplitElement = "true";
+			if (align === "justify" && alignLast === "auto") {
+				deepest.dataset.alignLastSplitElement = "justify";
+			} else {
+				deepest.dataset.alignLastSplitElement = alignLast;
+			}
+		}
 	}
 
 	hasOverflow(element, bounds = this.bounds) {
@@ -591,8 +660,12 @@ class Layout {
 			Math.max(Math.floor(height), scrollHeight) > Math.round(bounds.height);
 	}
 
-	findOverflow(rendered, bounds = this.bounds, gap = this.gap) {
-		if (!this.hasOverflow(rendered, bounds)) return;
+	findOverflow(rendered, bounds = this.bounds, gap = this.gap, force = false) {
+		// `force` bypasses the rounded hasOverflow gate: the closed-loop verification in
+		// findBreakToken re-runs this walk on post-mutation geometry, where the violations
+		// it hunts (parked rects, flush crossings) can hide below the gate's floor/round
+		// resolution (a flush row crosses by 0.13px; scroll metrics don't see it).
+		if (!force && !this.hasOverflow(rendered, bounds)) return;
 
 		let start = Math.floor(bounds.left);
 		let end = Math.round(bounds.right + gap);
@@ -620,7 +693,29 @@ class Layout {
 				let top = Math.round(pos.top);
 				let bottom = Math.floor(pos.bottom);
 
-				if (!range && (left >= end || top >= vEnd)) {
+				// A table row whose border box lands within ~a pixel of the area bottom
+				// (either side) is retained with zero slack: the rounded tests forgive
+				// it (floor(bottom) > vEnd misses sub-pixel geometry), but any
+				// post-break restyle nudges it over, the screen layout then parks a box
+				// sliver in the overflow column, and the print pass — whose
+				// fragmentation re-rounds independently — drops the whole row. Demand a
+				// small clearance using EXACT geometry and push the row whole through
+				// the element machinery below (which honors rowspan/break-inside).
+				// Deliberately coarse: a fragmented row's union bottom is always ≈ the
+				// area bottom (its continuation fragment is an empty box stretched to
+				// the column height), so this fires for every boundary row — including
+				// ones the descend path could split — but the descend path is BLOCKED
+				// for break-inside:avoid cells (their boundary rows would otherwise
+				// strand empty split shells in the overflow column), and a row too tall
+				// for any page resolves through the existing equalTokens loop guard.
+				// The TIGHT_CROSSING_MAX band only bounds the unfragmented sub-pixel
+				// case.
+				let rowCrossesTight = !range && node.nodeName === "TR" &&
+					pos.top < bounds.bottom &&
+					pos.bottom > bounds.bottom - BREAK_CLEARANCE &&
+					pos.bottom - bounds.bottom < TIGHT_CROSSING_MAX;
+
+				if (!range && (left >= end || top >= vEnd || rowCrossesTight)) {
 					// Check if it is a float
 					let isFloat = false;
 
@@ -688,8 +783,48 @@ class Layout {
 					}
 
 					if (!br && !isFloat && isElement(node)) {
+						// Element-boundary clearance (third shape of the zero-slack
+						// disease, after textBreak lines and table rows): the retained
+						// sibling(s) just before this break may end flush against the
+						// area bottom. The split marks their ancestor chain data-split-to
+						// and restyles it (margin unsets, alignment, height clamps) —
+						// zero slack means the flush content relayouts into the hidden
+						// overflow column: painted off-page, invisible in preview AND
+						// print, yet present in the PDF text layer (so the print-loss
+						// count never fires; only the margin guard sees it). Walk the
+						// break back over flush siblings, then climb like the offset-0
+						// text path so an emptied parent can't survive as a stub.
+						let breakTarget = node;
+						while (breakTarget.previousElementSibling) {
+							let prevRect = getBoundingClientRect(breakTarget.previousElementSibling);
+							if (!(prevRect.height > 0 &&
+								prevRect.top < bounds.bottom &&
+								prevRect.top >= bounds.top &&
+								prevRect.bottom > bounds.bottom - BREAK_CLEARANCE)) {
+								break;
+							}
+							breakTarget = breakTarget.previousElementSibling;
+						}
+						if (breakTarget !== node) {
+							let climbParent = breakTarget.parentNode;
+							while (climbParent && climbParent !== rendered) {
+								let firstSignificant = null;
+								for (let childNode = climbParent.firstChild; childNode; childNode = childNode.nextSibling) {
+									if (childNode.nodeType === 1 ||
+										(childNode.nodeType === 3 && childNode.textContent.trim().length)) {
+										firstSignificant = childNode;
+										break;
+									}
+								}
+								if (firstSignificant !== breakTarget) {
+									break;
+								}
+								breakTarget = climbParent;
+								climbParent = breakTarget.parentNode;
+							}
+						}
 						range = document.createRange();
-						range.selectNode(node);
+						range.selectNode(breakTarget);
 						break;
 					}
 
@@ -709,6 +844,7 @@ class Layout {
 					let rect;
 					left = 0;
 					top = 0;
+					bottom = 0;
 					for (var i = 0; i != rects.length; i++) {
 						rect = rects[i];
 						if (rect.width > 0 && (!left || rect.left > left)) {
@@ -717,13 +853,49 @@ class Layout {
 						if (rect.height > 0 && (!top || rect.top > top)) {
 							top = rect.top;
 						}
+						if (rect.height > 0 && rect.bottom > bottom) {
+							bottom = rect.bottom;
+						}
 					}
 
-					if (left >= end || top >= vEnd) {
+					// `bottom > vEnd` mirrors textBreak's word-level condition: a text
+					// node whose lowest line box CROSSES the page boundary (sliced, not
+					// pushed — e.g. a one-line table row straddling the area bottom)
+					// passes the max-left/top tests, the walk then breaks at the NEXT
+					// element, and the crossing line relayouts into the hidden overflow
+					// column (silently dropped in print).
+					if (left >= end || top >= vEnd || Math.floor(bottom) > vEnd) {
 						range = document.createRange();
 						offset = this.textBreak(node, start, end, vStart, vEnd);
-						if (!offset) {
+						if (offset === undefined) {
 							range = undefined;
+						} else if (offset === 0) {
+							// The node's very first word already crosses the page edge —
+							// nothing of this text belongs on the page. The old falsy-0
+							// test voided the range, silently retaining the sliced first
+							// line (which print then drops). Break before the node — and
+							// climb to the outermost ancestor of which this text is the
+							// first in-flow content, so the break can't leave an empty
+							// shell behind (e.g. a bordered table-row stub whose cells
+							// all moved to the next page).
+							let breakNode = node;
+							let breakParent = breakNode.parentNode;
+							while (breakParent && breakParent !== rendered) {
+								let firstSignificant = null;
+								for (let childNode = breakParent.firstChild; childNode; childNode = childNode.nextSibling) {
+									if (childNode.nodeType === 1 ||
+										(childNode.nodeType === 3 && childNode.textContent.trim().length)) {
+										firstSignificant = childNode;
+										break;
+									}
+								}
+								if (firstSignificant !== breakNode) {
+									break;
+								}
+								breakNode = breakParent;
+								breakParent = breakNode.parentNode;
+							}
+							range.setStartBefore(breakNode);
 						} else {
 							range.setStart(node, offset);
 						}
@@ -732,7 +904,14 @@ class Layout {
 				}
 
 				// Skip children
-				if (skip || (right <= end && bottom <= vEnd)) {
+				// Never skip a subtree with table rows flush against the area bottom:
+				// the rounded bottom test reads a boundary-kissing table as fitting,
+				// which would hide its last row from the tight-row clearance check
+				// above.
+				let flushTableContent = pos.bottom > bounds.bottom - BREAK_CLEARANCE &&
+					(node.nodeName === "TABLE" || node.nodeName === "TBODY" ||
+						(isElement(node) && typeof node.querySelector === "function" && node.querySelector("tr")));
+				if (skip || (right <= end && bottom <= vEnd && !flushTableContent)) {
 					next = nodeAfter(node, rendered);
 					if (next) {
 						walker = walk(next, rendered);
@@ -798,7 +977,6 @@ class Layout {
 		let left = 0;
 		let right = 0;
 		let top = 0;
-		let bottom = 0;
 		let word, next, done, pos;
 		let offset;
 		while (!done) {
@@ -815,14 +993,32 @@ class Layout {
 			left = Math.floor(pos.left);
 			right = Math.floor(pos.right);
 			top = Math.floor(pos.top);
-			bottom = Math.floor(pos.bottom);
 
-			if (left >= end || top >= vEnd) {
+			// Safety net for a word SLICED across the column boundary (top slice in
+			// the page, bottom slice in the overflow column): its union rect keeps
+			// left/top inside the page, so check the word's own fragment rects for a
+			// piece parked past the column edge. The clearance tests below catch the
+			// common crossing-line shapes; this catches the already-fragmented one.
+			let parkedRects = word.getClientRects();
+			let parked = false;
+			for (let r = 0; r < parkedRects.length; r++) {
+				if (parkedRects[r].width > 0 && parkedRects[r].height > 0 && Math.floor(parkedRects[r].left) >= end) {
+					parked = true;
+					break;
+				}
+			}
+			if (parked || left >= end || top >= vEnd) {
 				offset = word.startOffset;
 				break;
 			}
 
-			if (right > end || bottom > vEnd) {
+			// Exact bottom with clearance (not the floored `bottom > vEnd`): the
+			// split we are creating will mutate the retained text afterwards (hyphen
+			// append, text-align-last, split-attr CSS), so a last line retained flush
+			// against the boundary gets nudged into the overflow column and dropped
+			// by print. Only split points are affected — text that never enters
+			// textBreak keeps its geometry and is never pushed.
+			if (right > end || pos.bottom > vEnd - BREAK_CLEARANCE) {
 				let letterwalker = letters(word);
 				let letter, nextLetter, doneLetter;
 
@@ -839,7 +1035,15 @@ class Layout {
 					left = Math.floor(pos.left);
 					top = Math.floor(pos.top);
 
-					if (left >= end || top >= vEnd) {
+					// The bottom test mirrors the word-level condition that entered this
+					// walk. Without it, a line box that STRADDLES the page boundary (a
+					// paragraph starting with less than one line-height of space is
+					// sliced by multicol, not pushed) passes the top-only test for every
+					// letter, the walk exhausts, and the crossing line is retained — the
+					// print pass then clips it and the extracted remainder relayouts
+					// into the hidden overflow column (silent content loss). Exact
+					// geometry with clearance, same rationale as the word test.
+					if (left >= end || top >= vEnd || pos.bottom > vEnd - BREAK_CLEARANCE) {
 						offset = letter.startOffset;
 						done = true;
 

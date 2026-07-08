@@ -99,7 +99,13 @@ class Page {
 			page.classList.add("pagedjs_first_page");
 		}
 
-		if (pgnum % 2 !== 1) {
+		// EDGE fork patch (layout-time parity seed): honour a whole-book physical offset so a
+		// segment rendered in isolation can LAY OUT with its true recto/verso side. finalizePage
+		// marks margin-box .hasContent against these classes at layout time, so a post-hoc class
+		// flip cannot recover side-dependent margin content — the side must be right from the start.
+		// Set window.PagedConfig.startPageOffset (0 = recto-first, 1 = verso-first) before preview().
+		var parityOffset = (typeof window !== "undefined" && window.PagedConfig && window.PagedConfig.startPageOffset) || 0;
+		if ((pgnum + parityOffset) % 2 !== 1) {
 			page.classList.remove("pagedjs_left_page");
 			page.classList.add("pagedjs_right_page");
 		} else {
