@@ -825,6 +825,16 @@ class Layout {
 						}
 						range = document.createRange();
 						range.selectNode(breakTarget);
+						// A break that takes the WHOLE page is not a break: nothing is placed, the
+						// token comes back unchanged and the flow stalls — an empty page, then a
+						// repeat. The clearance walk-back above can retreat to the first element on
+						// the page and then climb to its top-level container, which is exactly that
+						// case. Keep the un-retreated break instead: flush-content clearance is a
+						// refinement, and it must never cost the page everything on it.
+						if (breakTarget !== node && range.toString().length >= rendered.textContent.length) {
+							range = document.createRange();
+							range.selectNode(node);
+						}
 						break;
 					}
 
