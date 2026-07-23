@@ -7,8 +7,6 @@ import {
 	requestIdleCallback
 } from "../utils/utils.js";
 import { OverflowContentError } from "./renderresult.js";
-import BreakToken from "./breaktoken.js";
-import { nodeAfter } from "../utils/dom.js";
 
 const MAX_PAGES = false;
 const MAX_LAYOUTS = false;
@@ -371,39 +369,12 @@ class Chunker {
 			if (breakToken) {
 				let newToken = breakToken.toJSON(true);
 				if (tokens.lastIndexOf(newToken) > -1) {
-					// The break token did not advance: layout cannot place what comes next, so
-					// repeating it would loop forever. This used to RETURN, which abandoned every
-					// remaining page of the flow — a chapter would simply stop, with no error
-					// reaching the caller and no sign in the output. Losing the rest of a document
-					// is never the right answer to one unplaceable node.
-					//
-					// Force progress instead: step the token past the stuck node and carry on. The
-					// page that could not place it may be badly broken, and the node itself may be
-					// skipped, but everything after it lays out. The failure is recorded either way,
-					// so it can still be surfaced rather than silently absorbed.
+					// loop — everything after this token is abandoned, so record it before returning:
+					// the return value is swallowed by render(), which is how truncation went unreported.
 					let err = new OverflowContentError("Layout repeated", [breakToken.node]);
 					this.errors.push(err);
 					console.error("Layout repeated at: ", breakToken.node);
-
-					let advanced;
-					let candidateNode = breakToken.node;
-					// Walk forward until a token is found that has not already been attempted —
-					// consecutive unplaceable nodes must not each re-trigger this path.
-					while ((candidateNode = nodeAfter(candidateNode, content))) {
-						let candidate = new BreakToken(candidateNode, 0);
-						let candidateToken = candidate.toJSON(true);
-						if (tokens.lastIndexOf(candidateToken) === -1) {
-							tokens.push(candidateToken);
-							advanced = candidate;
-							break;
-						}
-					}
-
-					// Nothing further to place: the flow really has reached its end.
-					if (!advanced) {
-						return err;
-					}
-					breakToken = advanced;
+					return err;
 				} else {
 					tokens.push(newToken);
 				}
