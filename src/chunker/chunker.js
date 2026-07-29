@@ -114,6 +114,10 @@ class Chunker {
 
 		this.pages = [];
 		this.total = 0;
+		// Layout failures surfaced to the consumer. Previously an OverflowContentError was only
+		// RETURNED from the layout generator (swallowed by render()) or parked on Page.errors, so a
+		// truncated flow reached preview() indistinguishable from a complete one.
+		this.errors = [];
 
 		this.q = new Queue(this);
 		this.stopped = false;
@@ -155,6 +159,7 @@ class Chunker {
 
 		this.source = parsed;
 		this.breakToken = undefined;
+		this.errors = [];
 
 		if (this.pagesArea && this.pageTemplate) {
 			this.q.clear();
@@ -177,6 +182,13 @@ class Chunker {
 
 		this.rendered = true;
 		this.pagesArea.style.setProperty("--pagedjs-page-count", this.total);
+
+		// Drain per-page layout failures onto the flow. Page.errors already collected these from
+		// every renderTo/append; nothing read them, so overflow that Layout reported per page was
+		// invisible to preview() consumers.
+		for (let page of this.pages) {
+			if (page.errors && page.errors.length) this.errors.push(...page.errors);
+		}
 
 		await this.hooks.afterRendered.trigger(this.pages, this);
 
@@ -277,9 +289,13 @@ class Chunker {
 
 	async handleBreaks(node, force) {
 		let currentPage = this.total + 1;
-		let currentPosition = currentPage % 2 === 0 ? "left" : "right";
+		// EDGE fork patch (layout-time parity seed): break-before/after left|right|recto|verso must
+		// judge the side against the whole-book offset too, or a seeded segment inserts its blank
+		// filler pages on the wrong side. Mirrors the Page.index() classing patch.
+		let parityOffset = (typeof window !== "undefined" && window.PagedConfig && window.PagedConfig.startPageOffset) || 0;
+		let currentPosition = (currentPage + parityOffset) % 2 === 0 ? "left" : "right";
 		// TODO: Recto and Verso should reverse for rtl languages
-		let currentSide = currentPage % 2 === 0 ? "verso" : "recto";
+		let currentSide = (currentPage + parityOffset) % 2 === 0 ? "verso" : "recto";
 		let previousBreakAfter;
 		let breakBefore;
 		let page;
@@ -353,8 +369,10 @@ class Chunker {
 			if (breakToken) {
 				let newToken = breakToken.toJSON(true);
 				if (tokens.lastIndexOf(newToken) > -1) {
-					// loop
+					// loop — everything after this token is abandoned, so record it before returning:
+					// the return value is swallowed by render(), which is how truncation went unreported.
 					let err = new OverflowContentError("Layout repeated", [breakToken.node]);
+					this.errors.push(err);
 					console.error("Layout repeated at: ", breakToken.node);
 					return err;
 				} else {
